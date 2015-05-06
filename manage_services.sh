@@ -1,58 +1,55 @@
-# Proper header for a Bash script
 #!/bin/bash
-#title : run_services.sh
-#desciption :
-#usage : bash run_services.sh
 
 LOGGER='src/http_logging/http_logging_server.py'
 ADAPTER='src/adapters/AdapterServer.py'
 CONTROLLER='src/ControllerServer.py'
+
+SERVICES=(LOGGER ADAPTER CONTROLLER)
+
 PID_FILE='/var/run/ads.pid'
 
-# Start all the services
-start_all() {
+# Start the services
+start_service() {
   touch $PID_FILE
-  python $LOGGER &
-  echo 'LOGGER' >> $PID_FILE
-  #The variable "$!" has the PID of the last background process started. 
-  echo $! >> $PID_FILE
-  sleep 1
-  python2 $ADAPTER &
-  echo 'ADAPTER' >> $PID_FILE
-  echo $! >> $PID_FILE
-  sleep 1
-  python2 $CONTROLLER &
-  echo 'CONTROLLER' >> $PID_FILE
-  echo $! >> $PID_FILE
+  if [ -z $args ]
+  then
+    python $LOGGER &
+    #The variable "$!" has the PID of the last background process started. 
+    echo "LOGGER:$!" >> $PID_FILE
+    sleep 1
+    python2 $ADAPTER &
+    echo "ADAPTER:$!" >> $PID_FILE
+    sleep 1
+    python2 $CONTROLLER &
+    echo "CONTROLLER:$!" >> $PID_FILE
+
+  else
+    for i in "$args";
+    do
+      j=$i
+      echo $($j)
+      echo inside for 
+      echo $i
+      python $j &
+      echo "$i:$!" >> $PID_FILE
+    done 
+  fi
 }
 
-# Stop all the services 
-stop_all() {
+# Stop the services 
+stop_service() {
   if [ -f $PID_FILE ]
   then
-    kill -9 $(<"$PID_FILE")
+    for i in `cat $PID_FILE`;
+    do
+      kill `echo $i | cut -d ":" -f 2`;
+    done
     rm $PID_FILE
     echo 'done'
   else
     echo 'No services are running to be stopped'   
   fi
 }
-
-#Start an individual service
-start_one() {
-python $2 &
-echo $2 >> $PID_FILE
-echo $! >> $PID_FILE
-echo started $2
-}
-
-#Stop an individual service
-#stop_one() {
-# do a grep based on arg,
-# read the next line of the file 
-# matching the pattern
-
-#} 
 
 # Start mongod service
 start_mongod() {
@@ -88,39 +85,44 @@ pre_check() {
 if [ $# -eq '0' ]
 then
   pre_check &&
-  stop_all &&
-  start_all
+  stop_service &&
+  start_service
 	
 elif [ $# -eq '1' ]
 then
+  args=""
   case "$1" in
   'start')
     pre_check &&
-    stop_all &&
-    start_all 
+    stop_service &&
+    start_service 
     ;;
   
   'stop')
     echo 'stopping all the services...'
-    stop_all
+    stop_service
     ;;   
   esac
+  
+else
+  input_args=($@)
+  action=${input_args[0]}
+  args=${input_args[@]:1}
 
-elif [ $# -eq '2' ]
-then
-  if [ "$1" == "start" ]
+  if [ "$action" == "start" ]
   then
-    var = $2
-    echo $var
-    python $var &
-    echo $2 >> $PID_FILE
-    echo $! >> $PID_FILE
+    pre_check &&
+   # stop_service - here also ??
+    start_service "$args"
+
+  elif [ "$action" == "stop" ]
+  then
+    echo 'stop works'
+    stop_service "$args"
+
   else
-    echo 'need to write this '
+    echo 'Incorrect usage of arguments'
   fi
 
-
-else
-  echo 'hopefully this works'
 fi
 
