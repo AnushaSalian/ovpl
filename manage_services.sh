@@ -4,14 +4,14 @@ LOGGER='src/http_logging/http_logging_server.py'
 ADAPTER='src/adapters/AdapterServer.py'
 CONTROLLER='src/ControllerServer.py'
 
-SERVICES=(LOGGER ADAPTER CONTROLLER)
+SERVICES=("LOGGER" "ADAPTER" "CONTROLLER")
 
 PID_FILE='/var/run/ads.pid'
 
 # Start the services
 start_service() {
   touch $PID_FILE
-  if [ -z $args ]
+  if [ -z "$args" ]
   then
     python $LOGGER &
     #The variable "$!" has the PID of the last background process started. 
@@ -24,30 +24,80 @@ start_service() {
     echo "CONTROLLER:$!" >> $PID_FILE
 
   else
-    for i in "$args";
+    for a in $args;
     do
-      j=$i
-      echo $($j)
-      echo inside for 
-      echo $i
-      python $j &
-      echo "$i:$!" >> $PID_FILE
+      echo $a
+      echo ${#SERVICES[@]}      
+      for i in $SERVICES;
+      do
+	# This checks if service entered is valid.
+        echo $i
+        if [[ $i == $a ]] 
+        then
+          index=${SERVICES[$i]}
+	  echo $index
+	  case "$index" in
+          '0')
+            python $LOGGER &
+            echo "LOGGER:$!" >> $PID_FILE
+          ;;  
+          
+          '1')
+            python2 $ADAPTER &
+            echo "ADAPTER:$!" >> $PID_FILE
+          ;;         
+       
+          '2')
+            python2 $CONTROLLER &
+            echo "CONTROLLER:$!" >> $PID_FILE
+            ;;
+          esac
+        
+        else
+          continue 
+        fi	
+      done
     done 
   fi
 }
 
 # Stop the services 
 stop_service() {
-  if [ -f $PID_FILE ]
+  if [ -z "$args" ]
   then
-    for i in `cat $PID_FILE`;
-    do
-      kill `echo $i | cut -d ":" -f 2`;
-    done
-    rm $PID_FILE
-    echo 'done'
+    if [ -f $PID_FILE ]
+    then
+      for i in `cat $PID_FILE`;
+      do
+        kill `echo $i | cut -d ":" -f 2`;
+      done
+      rm $PID_FILE
+      echo 'done'
+    else
+      echo 'No services are running to be stopped'   
+    fi
+
   else
-    echo 'No services are running to be stopped'   
+    for a in $args;
+    do
+      if [ -f $PID_FILE ]
+      then
+        for i in `cat $PID_FILE`; 
+        do
+          process_name=`echo $i | cut -d ":" -f 1`
+          process_id=`echo $i | cut -d ":" -f 2`
+          if [[ $process_name == $a ]]
+          then
+            kill $process_id;
+            echo Stopping $a 
+            sed '/$process_name/d' $PID_FILE
+            echo 'done'
+          fi
+        done
+      else
+        echo 'No services are running to be stopped'
+      fi
+    done
   fi
 }
 
@@ -117,7 +167,6 @@ else
 
   elif [ "$action" == "stop" ]
   then
-    echo 'stop works'
     stop_service "$args"
 
   else
