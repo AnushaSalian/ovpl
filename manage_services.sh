@@ -90,7 +90,7 @@ stop_service() {
           then
             kill $process_id;
             echo Stopping $a 
-            sed '/$process_name/d' $PID_FILE
+            sed /$process_name/d $PID_FILE
             echo 'done'
           fi
         done
