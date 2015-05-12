@@ -152,6 +152,10 @@ then
     echo 'stopping all the services...'
     stop_service
     ;;   
+
+  *)
+    echo 'Invalid action'
+    ;;  
   esac
   
 else
