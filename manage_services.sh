@@ -8,13 +8,16 @@ SERVICES=(LOGGER ADAPTER CONTROLLER)
 
 PID_FILE='/var/run/ads.pid'
 
-# Start the services
+# Start the services.
 start_service() {
   touch $PID_FILE
+  # If no specific services are mentioned,
+  # start all the services.
   if [ -z "$args" ]
   then
     python $LOGGER &
-    #The variable "$!" has the PID of the last background process started. 
+    # The variable "$!" has the PID of the last
+    # background process started. 
     echo "LOGGER:$!" >> $PID_FILE
     sleep 1
     python2 $ADAPTER &
@@ -24,14 +27,18 @@ start_service() {
     echo "CONTROLLER:$!" >> $PID_FILE
 
   else
+    # Start the specific services mentioned
+    # by the user.
     for arg in $args;
     do
     contains "$arg"
-    if [ $status == 0 ]
+    if [ "$status" == "0" ]
     then    
       # Since the services ex. LOGGER are stored
       # inside input arguments, it is tricky to
-      # extract a variable name from a variable. Refer
+      # extract a variable name from a variable.
+      # This has been done here using "${!arg}" 
+      # syntax. Refer
       # http://www.linuxquestions.org/questions/programming-9/bash-how-to-get-variable-name-from-variable-274718/ 
       # for more clearity.
       python ${!arg} &
@@ -45,8 +52,10 @@ start_service() {
   fi
 }
 
-# Stop the services 
+# Stop the services. 
 stop_service() {
+  # If no specific service is mentioned,
+  # stop all the services.
   if [ -z "$args" ]
   then
     if [ -f $PID_FILE ]
@@ -62,6 +71,8 @@ stop_service() {
     fi
 
   else
+    # Stop only the service(s) mentioned by
+    # the user.
     for arg in $args;
     do
       if [ -f $PID_FILE ]
@@ -86,37 +97,36 @@ stop_service() {
 }
 
 # To check if the service entered by the user
-# is valid or not
+# is valid or not.
 contains() {
-  echo $arg
-  for service in $SERVICES;
+  for ((i=0; i < ${#SERVICES[@]}; i++))
   do
-    if [ $arg == $service ]
+    if [ $arg == ${SERVICES[$i]} ]
     then
       status=0       
-    else
-      status=1
+      return $status
     fi
-    return $status
   done
+  status=1
+  return $status
 }
 
-# Start mongod service
+# Start mongod service.
 start_mongod() {
   service mongodb start
 }
 
-# Stop mongod service
+# Stop mongod service.
 stop_mongod() {
   service mongodb stop
 }
 
-# Repair mongod service
+# Repair mongod service.
 repair_mongod() {
   mongodb --repair
 }
 
-# Check if the service mongod is already running
+# Check if the service mongod is already running.
 pre_check() {
   service mongodb status
   if [ $? -ne 0 ]
@@ -131,6 +141,8 @@ pre_check() {
   fi
 }
 
+# Correct usage of the script and its valid 
+# arguments.
 usage() {
   echo 'Usage:'
   echo 'Valid Services : LOGGER, ADAPTER and CONTROLLER'
@@ -144,18 +156,24 @@ usage() {
   echo './manage_services.sh stop SERVICE1 SERVICE2'
 }
 
+
+# If the script is executed alone, all the services 
+# are started.
 if [ $# -eq '0' ]
 then
   pre_check 
   stop_service 
   start_service
 
+# This is the help option, to view the correct
+# usage of the script and its valid arguments.
 elif [ $1 == "-h" ]
 then
   usage
 
-# if arguments are greater than or equal to 1
-# other than help	
+# If arguments are greater than or equal to 1
+# other than help. This means that the user has 
+# entered specific services to be started/stopped.	
 else 
   input_args=($@)
   action=${input_args[0]}
