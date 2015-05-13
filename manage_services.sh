@@ -4,7 +4,7 @@ LOGGER='src/http_logging/http_logging_server.py'
 ADAPTER='src/adapters/AdapterServer.py'
 CONTROLLER='src/ControllerServer.py'
 
-SERVICES=("LOGGER" "ADAPTER" "CONTROLLER")
+SERVICES=(LOGGER ADAPTER CONTROLLER)
 
 PID_FILE='/var/run/ads.pid'
 
@@ -24,40 +24,24 @@ start_service() {
     echo "CONTROLLER:$!" >> $PID_FILE
 
   else
-    for a in $args;
+    for arg in $args;
     do
-      echo $a
-      echo ${#SERVICES[@]}      
-      for i in $SERVICES;
-      do
-	# This checks if service entered is valid.
-        echo $i
-        if [[ $i == $a ]] 
-        then
-          index=${SERVICES[$i]}
-	  echo $index
-	  case "$index" in
-          '0')
-            python $LOGGER &
-            echo "LOGGER:$!" >> $PID_FILE
-          ;;  
-          
-          '1')
-            python2 $ADAPTER &
-            echo "ADAPTER:$!" >> $PID_FILE
-          ;;         
-       
-          '2')
-            python2 $CONTROLLER &
-            echo "CONTROLLER:$!" >> $PID_FILE
-            ;;
-          esac
-        
-        else
-          continue 
-        fi	
-      done
-    done 
+    contains "$arg"
+    if [ $status == 0 ]
+    then    
+      # Since the services ex. LOGGER are stored
+      # inside input arguments, it is tricky to
+      # extract a variable name from a variable. Refer
+      # http://www.linuxquestions.org/questions/programming-9/bash-how-to-get-variable-name-from-variable-274718/ 
+      # for more clearity.
+      python ${!arg} &
+      echo "$arg:$!" >> $PID_FILE
+      sleep 1
+    else
+      echo 'Invalid arguments'
+      usage
+    fi
+    done      
   fi
 }
 
@@ -78,19 +62,19 @@ stop_service() {
     fi
 
   else
-    for a in $args;
+    for arg in $args;
     do
       if [ -f $PID_FILE ]
       then
-        for i in `cat $PID_FILE`; 
+        for process in `cat $PID_FILE`; 
         do
-          process_name=`echo $i | cut -d ":" -f 1`
-          process_id=`echo $i | cut -d ":" -f 2`
-          if [[ $process_name == $a ]]
+          process_name=`echo $process | cut -d ":" -f 1`
+          process_id=`echo $process | cut -d ":" -f 2`
+          if [[ $process_name == $arg ]]
           then
             kill $process_id;
-            echo Stopping $a 
-            sed /$process_name/d $PID_FILE
+            echo Stopping $arg 
+            sed -i /$process_name/d $PID_FILE
             echo 'done'
           fi
         done
@@ -99,6 +83,22 @@ stop_service() {
       fi
     done
   fi
+}
+
+# To check if the service entered by the user
+# is valid or not
+contains() {
+  echo $arg
+  for service in $SERVICES;
+  do
+    if [ $arg == $service ]
+    then
+      status=0       
+    else
+      status=1
+    fi
+    return $status
+  done
 }
 
 # Start mongod service
@@ -131,42 +131,40 @@ pre_check() {
   fi
 }
 
+usage() {
+  echo 'Usage:'
+  echo 'Valid Services : LOGGER, ADAPTER and CONTROLLER'
+  echo '1. For starting all the services:'
+  echo ' a) ./manage_services.sh'
+  echo ' b) ./manage_services.sh start'
+  echo '2. For stopping all the services:'
+  echo './manage_services.sh stop'
+  echo '3. For an individual start or stop:'
+  echo './manage_services.sh start SERVICE1'
+  echo './manage_services.sh stop SERVICE1 SERVICE2'
+}
 
 if [ $# -eq '0' ]
 then
-  pre_check &&
-  stop_service &&
+  pre_check 
+  stop_service 
   start_service
-	
-elif [ $# -eq '1' ]
-then
-  args=""
-  case "$1" in
-  'start')
-    pre_check &&
-    stop_service &&
-    start_service 
-    ;;
-  
-  'stop')
-    echo 'stopping all the services...'
-    stop_service
-    ;;   
 
-  *)
-    echo 'Invalid action'
-    ;;  
-  esac
-  
-else
+elif [ $1 == "-h" ]
+then
+  usage
+
+# if arguments are greater than or equal to 1
+# other than help	
+else 
   input_args=($@)
   action=${input_args[0]}
   args=${input_args[@]:1}
 
   if [ "$action" == "start" ]
   then
-    pre_check &&
-   # stop_service - here also ??
+    pre_check 
+    stop_service "$args"
     start_service "$args"
 
   elif [ "$action" == "stop" ]
@@ -174,8 +172,8 @@ else
     stop_service "$args"
 
   else
-    echo 'Incorrect usage of arguments'
+    echo 'Invalid action'
+    usage
   fi
-
 fi
 
